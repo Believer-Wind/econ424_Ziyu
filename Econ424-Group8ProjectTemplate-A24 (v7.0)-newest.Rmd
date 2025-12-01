@@ -1,0 +1,1186 @@
+---
+title: "Econ 424 Project Template"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+    df_print: paged
+---
+
+```{r, echo = FALSE}
+options(digits=3, width=70)
+# load packages
+suppressPackageStartupMessages(library(IntroCompFinR))
+suppressPackageStartupMessages(library(PerformanceAnalytics))
+suppressPackageStartupMessages(library(quantmod))
+suppressPackageStartupMessages(library(boot))
+suppressPackageStartupMessages(library(corrplot))
+suppressPackageStartupMessages(library(xtable))
+suppressPackageStartupMessages(library(knitr))
+suppressPackageStartupMessages(library(lubridate))
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(gridExtra))
+
+# change this to the appropriate path on your computer
+savePath="/Users/liaoziyu/Downloads"
+resetPar = par()
+```
+
+# Project Goal
+## Organization of Results
+
+As in the homework assignments, summarize your R work in an R Markdown file. Look at the overall results, choose your main points, and select the main results for your presentation. Submit this file in addition as won't be able to cover everything in the verbal presentation.
+
+## Presentation Focus
+
+Your presentation should consist of:
+
+1.  An executive summary, what are your main observations and key lessons to be shared? You may summarize the main results using bullet points.
+
+2.  Sections that summarize the main results of your statistical analysis by topic (see below) - Given the time constraint, you want to focus on presenting results that illustrate the key messages mentioned in the summary.
+
+That is, submit this writeup with all R-outputs, but present only a selected part of it.
+
+## Analysis of Questions (you may want to divide the work amongst your groupmates and then put the whole presenation together.)
+
+Here, you will create R code to do the analysis for the project.
+
+
+
+# Data - Step 1
+## Task 1: Data Selection
+
+*Choose 4-6 assets of your own that resemble some sensible portfolio choices. Please motivate your choices briefly. You should also choose a sample period that can illustrate some lessons.*
+
+The template below uses the following 5 assets over 10 years: Change them to your own choices.
+
+1.  US Stocks. Vanguard Total Stock Market ETF (AMD)
+2.  Municipal Bonds. Vanguard Tax-Exempt Bond Index ETF (TSLA)
+3.  Foreign Developed Stocks. Vanguard FTSE Developed Markets ETF (DAL)
+4.  Emerging market stocks. Vanguard FTSE Emerging Markets ETF (F)
+5.  Dividend Growth Stocks. Vanguard Dividend Appreciation ETF (KO) (a possible one: Goldman Sachs Physical Gold ETF (AAAU)
+
+**What we Pick**
+1. AMD (AMD) - A growing stock, we anticipate that many group would select NVIDIA for their analysis since it is skyrocketing, we chose another typical firm in this field for comparison
+2. Tesla (TSLA) - Another growing stock. We are curious about how this company behave when we are entering this electronic revolution era and TSLA has been playing a rather important role.
+3. Delta Airline (DAL) - A periodic stock, we anticipate this stock to have a consistent behavior during each business cycle since no majority breakthrough had occurred in the aviation business.
+4. Ford (F) - Another periodic stock. We select this one because Ford has a direct competition with Tesla in vehicle manufacturing business, and Ford also transiting to electric car manufacturing business, yet it is not demonstrating a comparative advantage in this business,so we are curious about how this stock would react to what Tesla has done.
+5. Coca-Cola (KO) - Coca-Cola is an enormous organization that demonstrates strong capability in maintaining a reliable supply-chain and source material for mass output of the world renowned drink. Yet we found one thing interesting. Coca-cola has two affiliation. One is the parent company called The Coca-Cola Company, another is called Coca-Cola Consolidated Inc. The latter is responsible for manufacture and transportation, while the parent company controls the coca-cola manufacturing and design. In this case, we select the parent company for analysis.
+
+You can pick your assets by looking at the [Yahoo! finance site](http://finance.yahoo.com/). You can retrieve the sticker symbol and the quote data, and look at Profile to get a summary of the asset. Be sure to read about the asset - ETF, mutual funds, stock, bond - to get some understanding of their history and qualities.
+
+Data for the project are downloaded automatically from Yahoo! and consist of closing price data on 5 Vanguard ETFs:
+
+```{r, echo=FALSE}
+# retrieve data for questions
+last.date = as.Date("2024-12-1")
+# last.date = Sys.Date()
+first.date = last.date - years(10)
+project.symbols = c("AMD","TSLA","DAL","F","KO")
+# import daily prices
+project.prices <- 
+  getSymbols(project.symbols, src = 'yahoo', 
+             from = as.character(first.date), 
+             to = as.character(last.date),
+             auto.assign = TRUE, 
+             warnings = FALSE) %>% 
+  map(~Ad(get(.))) %>% 
+  reduce(merge) %>%
+  `colnames<-`(project.symbols)
+# get monthly prices
+projectPrices = to.monthly(project.prices, OHLC=FALSE)  
+# Group 8: focus your analysis using daily prices, but you'd want to compare them with results based on monthly data to illustrate how daily data differ.  Template below use projectPrices (monthly), not project.prices (daily)
+```
+
+## Task 2: Calculate Monthly and Daily Simple Return
+```{r, echo=FALSE}
+# calculate monthly simple returns 
+projectReturns = na.omit(Return.calculate(projectPrices, method = "discrete"))
+ret.mat = coredata(projectReturns)
+
+# calculate daily simple returns
+project.Returns = na.omit(Return.calculate(project.prices, method = "discrete"))
+retd.mat = coredata(project.Returns)
+```
+
+
+# Prices and Returns - Step 2
+
+## Task 1: Compute Daily Price/Return Time Plot (Comment Needed)
+**For each asset, compute time plots of daily prices and simple returns and comment. (e.g Are there any unusually large or small returns? Can you identify any news events that may explain these unusual values? are they stationary? Do they look different from the monthly data we've been looking at most of the quarter?)**
+
+```{r, echo = FALSE}
+
+
+# Monthly Price
+grid.arrange(
+  autoplot(projectPrices[, "AMD"]),
+  autoplot(projectPrices[, "TSLA"]),
+  autoplot(projectPrices[, "DAL"]),
+  autoplot(projectPrices[, "F"]),
+  autoplot(projectPrices[, "KO"]),
+  nrow=3
+)
+
+# Daily Price
+grid.arrange(
+  autoplot(project.prices[, "AMD"]),
+  autoplot(project.prices[, "TSLA"]),
+  autoplot(project.prices[, "DAL"]),
+  autoplot(project.prices[, "F"]),
+  autoplot(project.prices[, "KO"]),
+  nrow=3
+)
+
+# Monthly Return
+grid.arrange(
+  autoplot(projectReturns[, "AMD"]),
+  autoplot(projectReturns[, "TSLA"]),
+  autoplot(projectReturns[, "DAL"]),
+  autoplot(projectReturns[, "F"]),
+  autoplot(projectReturns[, "KO"]),
+  nrow=3
+)
+
+
+# Daily Return
+grid.arrange(
+  autoplot(project.Returns[, "AMD"]),
+  autoplot(project.Returns[, "TSLA"]),
+  autoplot(project.Returns[, "DAL"]),
+  autoplot(project.Returns[, "F"]),
+  autoplot(project.Returns[, "KO"]),
+  nrow=3
+)
+
+```
+
+**Comment:** 
+Our report mainly focus on daily analysis:
+
+Daily Price Analysis:
+
+1.Volatility Differences:
+- Growth stocks like AMD and TSLA show significantly higher volatility, reflecting their sensitivity to market trends and news.
+- Defensive stocks like KO are relatively stable, aligning with their reputation as low-risk investments.
+
+2.COVID-19 Impact:
+- Stocks in the airline industry (e.g., DAL) experienced a severe downturn during the pandemic but have shown recovery as travel resumed.
+- Tech and EV stocks (e.g., AMD, TSLA) saw increased demand during and after the pandemic due to shifting consumer behavior and market trends.
+
+3.Recent Trends:
+Most stocks show increased price fluctuations in the 2022-2024 period, likely driven by macroeconomic factors such as inflation, interest rate hikes, and geopolitical uncertainty.
+
+Comparison: The monthly price has a very similar trend with the daily price.
+
+
+Daily Return Analysis:
+
+1.Volatility Comparison:
+- AMD and TSLA exhibit the highest volatility, characterized by sharp spikes in returns.
+- Defensive stocks like KO show low and consistent volatility, making them suitable for risk-averse investors.
+
+2.COVID-19 Impact:
+- Assets like DAL show clear impacts during early 2020, reflecting the sensitivity of the airline industry to the pandemic.
+- AMD and TSLA seem less affected during the initial phase of COVID-19 but show heightened volatility later due to macroeconomic uncertainties.
+
+3.Market Behavior:
+- Growth stocks (AMD, TSLA) are prone to large price swings, reflecting their speculative nature.
+- Established, stable companies (KO, F) exhibit smaller fluctuations, reflecting predictable performance and lower risk.
+
+Comparison:
+
+Monthly data is more smooth. If we are looking at the price differences over a longer period of time, there are no particular differences excepts daily price data consists more spikes. When we are looking at daily and monthly return, on the other hand, we can observe dramatic differences.
+
+- First of all, since daily data consists more number of observations, it looks more consistent and cringed in a small area. Monthly data on the other hand, looks more volatile and more difficult to eyeballing the return over such long period.
+
+- Another major difference is that daily return captures more risky events occurred that does not have major effect in the long run. For example, we can observe an exceedingly high return for AMD around 2017, while this trend is not captured in monthly data. We think could use an analogy to understand the relationship between daily and monthly data whereas daily data is the first order derivative of the latter. Since daily return is calculated in a very short period of time, we should expect to see the irrational reaction to the temporary news occurred, and in long-run, i.e. monthly return, the market is once back to equilibrium. We can also see events that has huge impact on overall market like Global Pandemic, the aftermath would endure and continue to affect asset, which will present in the monthly return data.
+
+## Task 2: Equity Curve (Comment Revise Needed)
+**Q: Give a plot showing the growth of \$1 in each of the funds over the five year period (recall, this is called an "equity curve"). Which fund gives the highest future value? Are you surprised?**
+
+```{r}
+# Overall Trend
+chart.CumReturns(project.Returns, wealth.index = TRUE, main = "Cumulative Return", 
+                 begin = "first", plot.engine = "default", legend.loc = "topleft")
+```
+
+```{r}
+# Each Segments
+chart.CumReturns(project.Returns$AMD, wealth.index = TRUE, main = "Cumulative Return", 
+                 begin = "first", plot.engine = "default", legend.loc = "topleft")
+chart.CumReturns(project.Returns$TSLA, wealth.index = TRUE, main = "Cumulative Return", 
+                 begin = "first", plot.engine = "default", legend.loc = "topleft")
+chart.CumReturns(project.Returns$DAL, wealth.index = TRUE, main = "Cumulative Return", 
+                 begin = "first", plot.engine = "default", legend.loc = "topleft")
+chart.CumReturns(project.Returns$F, wealth.index = TRUE, main = "Cumulative Return", 
+                 begin = "first", plot.engine = "default", legend.loc = "topleft")
+chart.CumReturns(project.Returns$KO, wealth.index = TRUE, main = "Cumulative Return", 
+                 begin = "first", plot.engine = "default", legend.loc = "topleft")
+
+```
+
+**Comment:** Which asset yields the highest return over the five year periods depends on the time slot we choose. We split the timeline into two part, one is from 2015 to 2020, another is 2020 and forward. We are typically interested in seeing how those assets react to the global epidemic crisis. In the previous part, we can observe that AMD, KO, and F are somewhat alike, though F later fall behind. Then we might have to conclude that KO is slightly better asset when considering the equity curve during this five year period. Nevertheless, once the COVID pandemic breakout, all assets experienced a dramatic set back. We consider this as a "start over" situation, and we were surprised to see how resilient the AMD and Tesla are.
+
+```{r}
+# Compare with monthly return
+chart.CumReturns(projectReturns, wealth.index = TRUE, main = "Cumulative Return", 
+                 begin = "first", plot.engine = "default", legend.loc = "topleft")
+
+```
+
+Comparing with the Monthly return, we can observe smoother curves and more obvious trend. The trending are similar between that of the daily return, but we noticed the fall are less dramatic. It is easy to see that the monthly return fall short to around 1.4 for AMD, yet 1.3 for daily return. The difference is mild, so we might conclude that monthly equity curve is similar to the daily equity curve. In conclusion, due to the similarity on the trend over a long period horizon, we have no reason to believe that daily analysis will be more stands out to monthly analysis.
+
+## Task 3: Sample Statistics (Comment Needed)
+**Create four panel diagnostic plots containing histograms, boxplots, qq-plots, and SACFs for each return series and comment. Do the returns look normally distributed? Are there significant outliers in the data? Is there any evidence of linear time dependence?**
+
+```{r}
+# Daily Returns
+par(mfrow = c(1,1), mar = c(4,4,2,1))
+fourPanelPlot(project.Returns[,"AMD"])
+fourPanelPlot(project.Returns[,"TSLA"])
+fourPanelPlot(project.Returns[,"DAL"])
+fourPanelPlot(project.Returns[,"F"])
+fourPanelPlot(project.Returns[,"KO"])
+```
+
+```{r}
+# Monthly
+par(mfrow = c(1,1), mar = c(4,4,2,1))
+fourPanelPlot(projectReturns[,"AMD"])
+fourPanelPlot(projectReturns[,"TSLA"])
+fourPanelPlot(projectReturns[,"DAL"])
+fourPanelPlot(projectReturns[,"F"])
+fourPanelPlot(projectReturns[,"KO"])
+```
+
+**Comment:**
+We noticed that all charts have a decreasing ACF curve, which indicates that they might be covariance stationary. Different asset has different histogram, but their unique nature is not greatly revealed in the fourpanel plot;  nevertheless, we noticed drastic differences in box plot and qq-plot in two different data sets, thus our analysis will mainly focused on this aspect.
+
+For box plot, we noticed that daily data in general consists more outliers than its counterpart. This might because daily prices and return are more sensitive to the random news induced by different firms. For example, a news about a CEO's retirement might greatly influence this company's daily stock price, which may plunge to a drastically low point. However, as more time given to the investors,  such irrational behaviour can be reduced or its effect can be mitigated, therefore, the market behaviour can return to a less volatile state.
+
+This observation is confirmed by the qq plot. In the monthly data, most assets are fitting the normal distribution curve in the qq-plot, while in the daily data, we noticed that all the graph share this S-shaped qq-plot, which indicates that data is overly peaked at the centre.
+
+## Taks 4: Distribution
+**Create a plot showing the distributions of all of the assets in one graph.**
+```{r}
+plot(density(project.Returns$AMD), xlab = "return", main = "Distribution of All Asset", xlim = c(-0.05, 0.05), ylim = c(0, 50), col = "red", lwd = 2)
+lines(density(project.Returns$TSLA), col="skyblue", lwd = 2)
+lines(density(project.Returns$DAL), col="pink",lwd = 2)
+lines(density(project.Returns$F), col="green", lwd = 2)
+lines(density(project.Returns$KO),col="orange", lwd = 2)
+legend("topleft", legend=c("AMD", "TSLA", "DAL", "F", "KO"), col=c("red", "skyblue", "pink", "green", "orange"),lty = c(1,1,1,1,1))
+```
+
+## Task 5: Univariate Descript Statistics
+**Compute univariate descriptive statistics (mean, variance, standard deviation, skewness, kurtosis, quantiles) for each return series and comment.**
+
+```{r}
+muhat.vals = apply(project.Returns, 2, mean)
+sd.vals = apply(project.Returns, 2, sd)
+skew.vals = apply(project.Returns, 2, skewness)
+ekurt.vals = apply(project.Returns, 2, kurtosis)
+q1.vals = apply(project.Returns, 2, quantile, probs = 0.01)
+q5.vals = apply(project.Returns, 2, quantile, probs = 0.05)
+q.vals = rbind(q1.vals, q5.vals)
+```
+
+## Task 6: Display results in a table
+
+```{r}
+stats.mat = rbind(muhat.vals, 
+                  sd.vals,
+                  skew.vals,
+                  ekurt.vals,
+                  q.vals)
+rownames(stats.mat) = c("Mean", "Std Dev", "Skewness", 
+                        "Excess Kurtosis", "1% Quantile", 
+                        "5% Quantile")
+kable(stats.mat, digits = 6)
+```
+
+**Q: Which assets have the highest and lowest average return? Which funds have the highest and lowest standard deviation? How about their skewness and excess kurtosis? For which assets is the assumption of normal distribution the most appropriate or problematic?**
+**Comment:** AMD has the highest average return; Ford has the lowest average return. As expected, AMD has the highest standard deviation; unexpectedly, The Coca-cola Company has the lowest standard deviation. For skewness and kurtosis, we believe TSLA is comparatively suitable to be assumed as normal distributed. AMD should not be safely considered as a normally distributed asset, since in reality, it is booming currently; theoretically, the excess kurtosis and positive skewness is harder for us to assume a normal distribution. Yet, since we only have to consider covariance stationary, our later analysis should not be vastly affected.
+
+## Task 7: x-y plot for risk-return relationship
+**Make an x-y plot with the standard deviations on the x-axis and the means on the y-axis. Comment on the risk-return relationship you see.**
+
+```{r}
+# Create x-y plot with standard deviations on the x-axis and means on the y-axis
+risk_return_df <- data.frame(
+  Asset = project.symbols,
+  Std_Dev = sd.vals,
+  Mean = muhat.vals
+)
+
+ggplot(risk_return_df, aes(x = Std_Dev, y = Mean, label = Asset)) +
+  geom_point() +
+  geom_text(vjust = -0.5, hjust = 0.5) +
+  ggtitle("Risk-Return Relationship (Mean vs. Std Dev)") +
+  xlab("Standard Deviation (Risk)") +
+  ylab("Mean Return")
+
+```
+**Comment:** According to the risk-return graph, we saw somewhat expected distribution of assets. AMD, TSLA, DAL, KO are behaving as we expected, i.e., the higher the average return, the larger the risk. Nevertheless, we are very surprised to see how Ford is having similar daily return as KO but having larger risk. We assume this is because that Ford is having a larger risk in its management and strategy in competing with other car manufacturer, while KO is still competitive in soft drink market.
+
+## Task 8: Estimated Standard Errors and CI
+**Compute estimated standard errors and form $95\%$ confidence intervals for the the estimates of the mean and standard deviation. Arrange these values nicely in a table. Are these means and standard deviations estimated very precisely? Which estimates are more precise: the estimated means or standard deviations? for which assets?**
+
+```{r}
+# Calculate SE and 95% confidence intervals for mean and SD
+n <- nrow(project.Returns)
+
+# SE for mean and SD
+se_mean_vals <- sd.vals / sqrt(n)
+se_sd_vals <- sd.vals / sqrt(2 * n)
+
+# 95% Confidence intervals
+ci_mean_lower <- muhat.vals - 2 * se_mean_vals
+ci_mean_upper <- muhat.vals + 2 * se_mean_vals
+ci_sd_lower <- sd.vals - 2 * se_sd_vals
+ci_sd_upper <- sd.vals + 2 * se_sd_vals
+
+# Create a table to display results
+ci_mat <- data.frame(
+  Mean = muhat.vals,
+  Mean_SE = se_mean_vals,
+  Mean_Lower_CI = ci_mean_lower,
+  Mean_Upper_CI = ci_mean_upper,
+  SD = sd.vals,
+  SD_SE = se_sd_vals,
+  SD_Lower_CI = ci_sd_lower,
+  SD_Upper_CI = ci_sd_upper
+)
+
+kable(ci_mat, caption = "95% Confidence Intervals for Mean and Standard Deviation", digits = 6)
+
+```
+**Comment:**
+Once again, we noticed that SE for both Mean and SD are comparatively small, yet if we compare the digits, we noticed that SE for SD is much more smaller compared to a relatively larger SD, thus we conclude as Monthly return we usually do, estimated SD is much more precise than the estimated mean, especially for KO, perhaps it is because KO is less volatile.
+
+## Task 9: Sharpe's Ratio
+**Using a monthly risk free rate equal to 0.0004167 per month (which corresponds to a continuously compounded annual rate of 0.5%), compute Sharpe's slope/ratio for each asset. Use the bootstrap to calculate estimated standard errors for the Sharpe ratios. Arrange these values nicely in a table. For the sample period you chose, look up what the federal fund rate is roughly, and convert it to daily rate**
+```{r}
+rfd = (1+0.0004167)^(1/30) - 1
+rf = 0.0004167
+```
+Next, we use the bootstrap to compute estimated SEs for the Sharpe ratios. First, we create a function to compute the Sharpe ratios to be passed to the `boot()` function and then we create another function to pull out the boostrap SEs and 95% confidence intervals. We run these functions and put the results in the following table:
+
+```{r, echo=FALSE}
+sharpeRatio.boot = function(x, idx, risk.free) {
+  muhat = mean(x[idx])
+  sigmahat = sd(x[idx])
+  sharpeRatio = (muhat - risk.free)/sigmahat
+  sharpeRatio
+}
+computeSEconfintSharpe = function(x, risk.free) {
+  Sharpe.boot = boot(x, statistic=sharpeRatio.boot, R=999, risk.free=risk.free)
+  Sharpe.hat = Sharpe.boot$t0
+  SE.Sharpe = sd(Sharpe.boot$t)
+  CI.Sharpe = boot.ci(Sharpe.boot, conf = 0.95, type="norm")$normal
+  CI.Sharpe = CI.Sharpe[-1]
+  ans = c(Sharpe.hat, SE.Sharpe, CI.Sharpe)
+  names(ans) = c("Sharpe", "SE", "LCL (0.95)", "UCL (0.95)")
+  return(ans)
+}
+
+# Daily Return with Daily RF
+set.seed(123)
+Sharpe.boot.AMD = computeSEconfintSharpe(retd.mat[, "AMD", drop=FALSE], risk.free=rfd)
+Sharpe.boot.TSLA = computeSEconfintSharpe(retd.mat[, "TSLA", drop=FALSE], risk.free=rfd)
+Sharpe.boot.DAL = computeSEconfintSharpe(retd.mat[, "DAL", drop=FALSE], risk.free=rfd)
+Sharpe.boot.F = computeSEconfintSharpe(retd.mat[, "F", drop=FALSE], risk.free=rfd)
+Sharpe.boot.KO = computeSEconfintSharpe(retd.mat[, "KO", drop=FALSE], risk.free=rfd)
+
+Sharped.mat = rbind(Sharpe.boot.AMD,
+                Sharpe.boot.TSLA,
+                Sharpe.boot.DAL,
+                Sharpe.boot.F,
+                Sharpe.boot.KO)
+rownames(Sharped.mat) = colnames(projectReturns)
+kable(Sharped.mat, digits = 6)
+```
+
+**Q: Which asset has the highest Sharpe slope?**
+**Comment:** AMD has the highest Sharpe Slope.
+
+```{r}
+# Monthly Return with Monthly RF
+set.seed(123)
+Sharpe.boot.AMD = computeSEconfintSharpe(ret.mat[, "AMD", drop=FALSE], risk.free=rf)
+Sharpe.boot.TSLA = computeSEconfintSharpe(ret.mat[, "TSLA", drop=FALSE], risk.free=rf)
+Sharpe.boot.DAL = computeSEconfintSharpe(ret.mat[, "DAL", drop=FALSE], risk.free=rf)
+Sharpe.boot.F = computeSEconfintSharpe(ret.mat[, "F", drop=FALSE], risk.free=rf)
+Sharpe.boot.KO = computeSEconfintSharpe(ret.mat[, "KO", drop=FALSE], risk.free=rf)
+
+Sharpe.mat = rbind(Sharpe.boot.AMD,
+                Sharpe.boot.TSLA,
+                Sharpe.boot.DAL,
+                Sharpe.boot.F,
+                Sharpe.boot.KO)
+rownames(Sharpe.mat) = colnames(projectReturns)
+kable(Sharpe.mat, digits = 6)
+```
+
+**Q: Are the Sharpe slopes estimated precisely?**
+**Comment:** According to the SE for Sharpe's Ratio, I would say that the Estimation for the Sharpe's slope is not very precise.
+
+## Task 10: Scatterplots
+**Compute and plot all pair-wise scatterplots between your assets. Briefly comment on any relationships you see.**
+
+```{r}
+pairs(coredata(project.Returns), col="blue", pch = 16, cex = 1.25, cex.axis = 1.25 )
+pairs(coredata(projectReturns), col="blue", pch = 16, cex = 1.25, cex.axis = 1.25 )
+```
+**Comment:**
+The scatter plot does not have clear relationship between different assets, so we might have to interpret those data based on our assumptions. TSLA and AMD are not obviously correlated since the data looks somewhat horizontal, same as other types of assets group with AMD. Yet once we look the data from different perspective, i.e. how other groups are correlated with TSLA, for example, we noticed that (AMD and TSLA) seems negatively correlated, but once compared with monthly data, those two are positively correlated as we normally would assume. We think the reason behind this is because daily data are less volatile bcause reaction to news is time consuming, thus daily returns tends have less obvious trend between different assets.
+
+## Task 11: Sample Covariance Matrix
+**Compute the sample covariance matrix of the returns on your assets and comment on the direction of linear association between the asset returns.**
+
+```{r}
+cov(project.Returns)
+cov(projectReturns)
+```
+**Comment:** As previously expected, daily returns are harder to exhibit clear and significant correlation between different asset compared with monthly data.
+
+## Task 12: Correlation Matrix
+**Compute the sample correlation matrix of the returns on your assets and plot this correlation matrix using the R corrplot package function `corrplot.mixed()`. Which assets are most highly correlated? Which are least correlated? Based on the estimated correlation values do you think diversification will reduce risk with these assets?**
+
+```{r}
+cor(project.Returns)
+corrplot.mixed(cor(project.Returns), lower = "number", upper = "ellipse")
+```
+**Comment:** To our surprise, Delta Airline and Ford are highly correlated. This result is beyond our expectation because these two firms are operating in different industry. So we assume macro factors are affect both, such as oil prices are affecting both during pandemic period, while Tesla, operating on electric, is not severely affected.
+
+# Value-at-Risk Calculations - Step 3
+
+## Task 1: VaR
+**Assume that you have \$100,000 to invest starting at Dec 31, 2023. For each asset, determine the 1% and 5% normal value-at-risk of the \$100,000 investment over a one month investment horizon based on the normal distribution using the estimated means and variances of your assets. Which assets have the highest and lowest VaR values?**
+```{r}
+investment <- 100000
+
+# Calculate the expected monthly return and standard deviation for each asset
+expected_returns <- colMeans(project.Returns)
+standard_deviations <- apply(project.Returns, 2, sd)
+
+# Define the z-scores for 1% and 5% confidence levels
+z_1_percent <- qnorm(0.01)
+z_5_percent <- qnorm(0.05)
+
+# Calculate 1% and 5% VaR for each asset
+VaR_1_percent <- (expected_returns + z_1_percent * standard_deviations) * investment
+VaR_5_percent <- (expected_returns + z_5_percent * standard_deviations) * investment
+
+# Combine the results into a data frame
+VaR_results <- data.frame(
+  Asset = colnames(projectReturns),
+  Expected_Return = expected_returns,
+  Standard_Deviation = standard_deviations,
+  VaR_1_Percent = VaR_1_percent,
+  VaR_5_Percent = VaR_5_percent
+)
+
+# Display the VaR results
+kable(VaR_results, digits = 6, caption = "1% and 5% Value-at-Risk (VaR) for Each Asset ($100,000 Investment)")
+
+# Identify which assets have the highest and lowest VaR values
+highest_VaR_1_percent <- VaR_results[which.max(abs(VaR_1_percent)), ]
+lowest_VaR_1_percent <- VaR_results[which.min(abs(VaR_1_percent)), ]
+
+highest_VaR_5_percent <- VaR_results[which.max(abs(VaR_5_percent)), ]
+lowest_VaR_5_percent <- VaR_results[which.min(abs(VaR_5_percent)), ]
+
+cat("Asset with the highest 1% VaR:", highest_VaR_1_percent$Asset, "\n")
+cat("Asset with the lowest 1% VaR:", lowest_VaR_1_percent$Asset, "\n")
+
+cat("Asset with the highest 5% VaR:", highest_VaR_5_percent$Asset, "\n")
+cat("Asset with the lowest 5% VaR:", lowest_VaR_5_percent$Asset, "\n")
+```
+
+## Task 2: Bootstrap for estimated SE and CI
+**Use the bootstrap to compute estimated standard errors and 95% confidence intervals for your 1% and 5% VaR estimates. Create a table showing the 1% and 5% VaR estimates along with the bootstrap standard errors and 95% confidence intervals (code provided). Looking at these results, comment on the precision of your VaR estimates (which assets are riskier..etc.)**
+
+Here, we write functions to compute VaR and extract bootstrap SEs and 95% CIs, and we use these functions to compute the $5\%$ and $1\%$ normal VaR estimates and their boostrap SEs and 95% CIs. The following tables summarizes the results:
+
+```{r, echo=FALSE}
+Value.at.Risk = function(x, p=0.05, w=100000, 
+                         method=c("normal", "empirical"),
+                         return.type=c("cc", "simple")) {
+	method=method[1]
+  return.type=return.type[1]
+  x = as.matrix(x)
+  if (method == "normal") {
+	  q = apply(x, 2, mean) + apply(x, 2, sd)*qnorm(p)
+  } else {    
+    q = apply(x, 2, quantile, p)
+  }
+  if (return.type == "simple") {
+    VaR = q*w
+  } else {
+	  VaR = (exp(q) - 1)*w
+  }
+	return(VaR)
+}
+
+ValueAtRisk.boot = function(x, idx, p=0.05, w=100000,
+                            method=c("normal", "empirical"),
+                            return.type=c("cc", "simple")) {
+  method = method[1]
+  return.type = return.type[1]
+  if (method == "normal") {
+	  q = mean(x[idx]) + sd(x[idx])*qnorm(p)
+  } else {
+    q = quantile(x[idx], p)
+  }
+  if (return.type == "cc") {
+	  VaR = (exp(q) - 1)*w
+  } else {
+    VaR = q*w
+  }
+	VaR
+}
+
+computeSEconfintVaR = function(x, p=0.05, w=100000,
+                               method=c("normal", "empirical"),
+                               return.type=c("cc", "simple")) {
+  VaR.boot = boot(x, statistic=ValueAtRisk.boot, p=p, R=999)
+  VaR.hat = VaR.boot$t0
+  SE.VaR = sd(VaR.boot$t)
+  CI.VaR = boot.ci(VaR.boot, conf = 0.95, type="norm")$normal
+  CI.VaR = CI.VaR[-1]
+  ans = c(VaR.hat, SE.VaR, CI.VaR)
+  names(ans) = c("VaR.05", "SE", "LCL (0.95)", "UCL (0.95)")
+  return(ans)
+}
+
+set.seed(123)
+VaR.boot.AMD = computeSEconfintVaR(retd.mat[, "AMD", drop=FALSE])
+VaR.boot.TSLA = computeSEconfintVaR(retd.mat[, "TSLA", drop=FALSE])
+VaR.boot.DAL = computeSEconfintVaR(retd.mat[, "DAL", drop=FALSE])
+VaR.boot.F = computeSEconfintVaR(retd.mat[, "F", drop=FALSE])
+VaR.boot.KO = computeSEconfintVaR(retd.mat[, "KO", drop=FALSE])
+
+VaR.mat = rbind(VaR.boot.AMD,
+                VaR.boot.TSLA,
+                VaR.boot.DAL,
+                VaR.boot.F,
+                VaR.boot.KO)
+                
+rownames(VaR.mat) = colnames(projectReturns)
+kable(VaR.mat)
+```
+
+```{r, echo=FALSE}
+set.seed(123)
+VaR.boot.AMD.01 = computeSEconfintVaR(retd.mat[, "AMD", drop=FALSE], p=0.01)
+VaR.boot.TSLA.01 = computeSEconfintVaR(retd.mat[, "TSLA", drop=FALSE], p=0.01)
+VaR.boot.DAL.01 = computeSEconfintVaR(retd.mat[, "DAL", drop=FALSE], p=0.01)
+VaR.boot.F.01 = computeSEconfintVaR(retd.mat[, "F", drop=FALSE], p=0.01)
+VaR.boot.KO.01 = computeSEconfintVaR(retd.mat[, "KO", drop=FALSE], p=0.01)
+
+VaR.mat.01 = rbind(VaR.boot.AMD.01,
+                VaR.boot.TSLA.01,
+                VaR.boot.DAL.01,
+                VaR.boot.F.01,
+                VaR.boot.KO.01)
+                
+rownames(VaR.mat.01) = colnames(projectReturns)
+colnames(VaR.mat.01)[1] = "VaR.01"
+kable(VaR.mat.01)
+```
+
+-   AMD has the highest 5% normal VaR values at -\$5680 and Coca-cola has the lowest at -\$1797. The bootstrap SE values are fairly small (about 20-25 times smaller than the VaR values) and the confidence intervals are not too wide.
+
+-   The rankings are same for the 1% VaR values: AMD has the highest VaR at -\$8023, and Coca-cola has the lowest at -\$2546. The bootstrap standard errors are about 20 times smaller than the VaR estimate2.
+
+## Task 3: Empirical VaR
+**Repeat the VaR analysis (but skip the bootstrapping and the annualized VaR calculation), but this time use the empirical 1% and 5% quantiles of the return distributions (which do not assume a normal distribution - this method is often called historical simulation). How different are the results from those based on the normal distribution?**
+
+**codes are provided but please explain how the two differ computationally in your presentation.**
+
+```{r, echo=FALSE}
+VaR.normal.05 = Value.at.Risk(retd.mat, p=0.05, 
+                              method="normal",
+                              return.type="cc")
+VaR.normal.01 = Value.at.Risk(retd.mat, p=0.01)
+VaR.empirical.05 = Value.at.Risk(retd.mat, p=0.05, 
+                                 method="empirical",
+                                 return.type="cc")
+VaR.empirical.01 = Value.at.Risk(retd.mat, p=0.01, 
+                                 method="empirical",
+                                 return.type="cc")
+VaR.mat = cbind(VaR.normal.05, VaR.empirical.05, VaR.normal.01, VaR.empirical.01)
+colnames(VaR.mat) = c("Normal VaR.05", "Empirical VaR.05", "Normal VaR.01", "Empirical VaR.01")
+kable(VaR.mat)
+```
+
+The normal and empirical VaR values are close.
+
+
+# Rolling Sample Statistics - Step 4
+## Task 1: Rolling Estimates Compute and Plot
+**Compute and plot the 24-month rolling estimates of the mean and volatility for each of the 5 ETFs. Plot the rolling means, volatilities and returns on the same graph for each asset. Does the assumption of covariance stationarity look reasonable for your data? (code provided) describe what you observe. Does COVID show up in the data?**
+
+The 24-month rolling means are shown below:
+
+```{r, echo=FALSE}
+roll.muhat = rollapply(project.Returns, width=24, by=1, 
+                       by.column=TRUE, FUN=mean, 
+                       align="right")
+plot(na.omit(roll.muhat), main="24-month rolling estimates of mean", multi.panel=FALSE, lwd=2,
+col=c("black", "red", "green", "blue", "purple"), lty=c("solid", "solid", "solid", "solid", "solid"),
+major.ticks="years", grid.ticks.on="years", legend.loc = "topright")
+```
+
+The rolling volatilities are:
+
+```{r, echo=FALSE}
+roll.sigmahat = rollapply(project.Returns, width=24, by=1, 
+                          by.column=TRUE, FUN=sd, 
+                          align="right")
+plot(na.omit(roll.sigmahat), main="24-month rolling estimates of volatility", multi.panel=FALSE, lwd=2,
+col=c("black", "red", "green", "blue", "purple"), lty=c("solid", "solid", "solid", "solid", "solid"),
+major.ticks="years", grid.ticks.on="years", legend.loc = "topleft")
+```
+
+Covariance stationarity implies that the mean and variance  of the time series do not change significantly over time. Based on the plots, rolling mean estimates are fluctuating around zero for all assets, but with noticeable variations, particularly during certain periods. Most of the assets show some level of mean reversion, where the mean tends to revert back to zero over time. However, there are also periods where the mean shifts significantly (e.g., around 2020).
+
+The volatility shows more pronounced changes over time compared to the mean. Volatility spikes, particularly around early 2020, can be observed for all the assets. This indicates that the assumption of constant volatility over the whole period is questionable. The plots clearly show a large volatility spike around early 2020, corresponding to the onset of the pandemic. This event led to a substantial increase in volatility across all assets, foe example Tesla (TSLA) and AMD, the volatility was particularly high, indicating significant uncertainty and price fluctuations during that period.
+
+# Portfolio Theory - Step 5
+
+*Use all 5 assets and the GWN model estimates computed from the full sample for the following computations. You may find it useful to create a table which summarizes the results from the portfolio calculations for easy reference.*
+
+## Task 1: Equally Weighted Portfolio, Expected Return and SD
+**Using the IntroCompFinR function getPortfolio(), create an equally weighted portfolio of the 5 ETFs and compute the expected return and standard deviation (volatility) of this portfolio**
+
+```{r}
+# Daily
+Sigma.d = cov(project.Returns)
+equallyWeights.d = matrix(1/5,5,1)
+expectR.d = apply(project.Returns,2, mean)
+daily.e = getPortfolio(expectR.d,Sigma.d,equallyWeights.d)
+daily.e
+```
+
+```{r}
+# Monthly
+Sigma.m = var(projectReturns)
+equallyWeights.m = matrix(1/5,5,1)
+expectR.m = apply(projectReturns,2, mean)
+getPortfolio(expectR.m,Sigma.m,equallyWeights.m)
+```
+
+Comment: The expected return of equally weighted portfolio with daily returns is 0.00105, and the standard deviation is 0.0178. 
+
+## Task 2: GMIN - Expected Return and SD
+**Compute the global minimum variance portfolio and calculate the expected return and SD of this portfolio. Are there any negative weights in the global minimum variance portfolio?**
+
+```{r}
+# Short sales for daily
+globalMin.d.shortSales = globalMin.portfolio(expectR.d,Sigma.d, shorts = TRUE)
+globalMin.d.shortSales
+```
+
+```{r}
+# Short Sales
+ss.bar = barplot(globalMin.d.shortSales$weights, col = c("lightblue", "orange", "darkgreen","purple","pink"), main = "GMV Portfolio Weights With Short Sales", names.arg = c( "AMD", "Tesla", "Delta", "Ford", "Coke-Cola"), ylim = c(0,1))
+text(x=ss.bar, y=globalMin.d.shortSales$weights, labels = paste0(round(globalMin.d.shortSales$weights, 3) * 100, "%"), pos = 3, cex = 0.8, col = "black")
+```
+ 
+ Comment: The expected return for global minimum variance portfolio with daily returns is 0.000425, and the standard deviation is 0.011.
+
+## Task 3: GMIN VaR
+**Assume that you have \$100,000 to invest starting at April 30, 2023. For the global minimum variance portfolio, determine the 1% and 5% normal value-at-risk of the \$100,000 investment over a one month investment horizon. Compare this value to the VaR values for the individual assets.**
+
+```{r}
+
+# Expected return and standard deviation for Global Minimum Variance Portfolio (With Short Sales)
+gmvp_return_short <- globalMin.d.shortSales$er  # Expected return of GMVP with short sales
+gmvp_sd_short <- globalMin.d.shortSales$sd  # Standard deviation of GMVP with short sales
+
+# Define the initial investment
+investment <- 100000
+
+# Define the z-scores for 1% and 5% confidence levels
+z_1_percent <- qnorm(0.01)
+z_5_percent <- qnorm(0.05)
+
+# Calculate 1% and 5% VaR for the GMVP with short sales
+VaR_1_percent_short <- (gmvp_return_short + z_1_percent * gmvp_sd_short) * investment
+VaR_5_percent_short <- (gmvp_return_short + z_5_percent * gmvp_sd_short) * investment
+
+VaR_1_percent_short
+VaR_5_percent_short
+
+# # Combine the results into a data frame for easy reference
+# VaR_results <- data.frame(
+#   Portfolio = c("GMVP No Short Sales", "GMVP With Short Sales"),
+#   VaR_1_Percent = c(VaR_1_percent_no_short, VaR_1_percent_short),
+#   VaR_5_Percent = c(VaR_5_percent_no_short, VaR_5_percent_short)
+# )
+# 
+# # Display the VaR results
+# kable(VaR_results, digits = 2, caption = "1% and 5% Value-at-Risk (VaR) for Global Minimum Variance Portfolios ($100,000 Investment)")
+```
+
+## Task 4: Efficient Portfolio Frontier
+**Using the estimated means, variances and covariances computed earlier, compute and plot the efficient portfolio frontier, allowing for short sales, for the 5 ETFs using the IntroCompFinR function `efficient.frontier()`. Create a plot (based on daily frequency) with portfolio expected return on the vertical axis and portfolio standard deviation on the horizontal axis showing the efficient portfolios. Indicate the location of the global minimum variance portfolio (with short sales allowed) as well as the locations of your 5 assets and the equally weighted portfolio.**
+
+```{r}
+ef.d.ss = efficient.frontier(expectR.d,Sigma.d,shorts = TRUE)
+ cex.val = 1
+ plot(ef.d.ss$sd, ef.d.ss$er, type="b", pch = 16, cex = cex.val,
+    ylim=c(-0.0007, max(ef.d.ss$er)), xlim=c(0, max(ef.d.ss$sd)),
+    xlab=expression(sigma[p]), ylab=expression(mu[p]), cex.lab=cex.val, col="darkgrey",
+    main = "Efficient Portfolio Frontier with Short Sales")
+ points(globalMin.d.shortSales$sd, globalMin.d.shortSales$er, pch = 13, col = "purple", cex = cex.val)
+text(x=globalMin.d.shortSales$sd, y=globalMin.d.shortSales$er, labels="Global min", pos=2, cex = cex.val, col = "purple")
+sigma.vec = sqrt(diag(Sigma.d))
+ points(daily.e$sd, daily.e$er, pch = 16, col = "brown", cex = cex.val)
+ text(x=daily.e$sd, y=daily.e$er, labels="equally weighted", pos=4, cex = cex.val, col = "brown")
+
+ points(sigma.vec[1:5], expectR.d[1:5], pch = 13, col = "darkblue", cex = cex.val)
+ text(x = sigma.vec[1:5], y = expectR.d[1:5], labels = names(sigma.vec), pos = 4, cex = cex.val, col = "darkblue")
+
+# for question later, seeing where the expected return should be.
+# points(daily.e$sd, daily.e$er)
+
+```
+
+## Task 5: Target Mean Efficient Portfolio
+**Find the efficient portfolio with the same mean as the equally weighted portfolio. How much smaller is the volatility of this portfolio compared to the equally weighted portfolio.**
+
+```{r}
+equallyWeights.ep.ss = efficient.portfolio(expectR.d, Sigma.d, 0.00105, shorts = TRUE)
+equallyWeights.ep.ss
+```
+
+```{r}
+ep5.bar = barplot(equallyWeights.ep.ss$weights, col = c("lightblue", "orange", "darkgreen","purple","pink"), main = "Target Return Efficient Portfolio Weights With Short Sales", names.arg = c( "AMD", "Tesla", "Delta", "Ford", "Coke-Cola"), ylim = c(-0.063,1))
+text(x=ep5.bar, y=equallyWeights.ep.ss$weights, labels = paste0(round(equallyWeights.ep.ss$weights, 3) * 100, "%"), pos = 3, cex = 0.7, col = "black")
+```
+
+```{r}
+equallyWeights.ep.nss = efficient.portfolio(expectR.d, Sigma.d, 0.00105, shorts = FALSE)
+equallyWeights.ep.nss
+
+ep5.nss.bar = barplot(equallyWeights.ep.nss$weights, col = c("lightblue", "orange", "darkgreen","purple","pink"), main = "Target Return Efficient Portfolio Weights Without Short Sales", names.arg = c( "AMD", "Tesla", "Delta", "Ford", "Coke-Cola"), ylim = c(-0.06,1))
+text(x=ep5.nss.bar, y=equallyWeights.ep.nss$weights, labels = paste0(round(equallyWeights.ep.nss$weights, 3) * 100, "%"), pos = 3, cex = 0.7, col = "black")
+```
+
+
+## Task 6: Target Risk Efficient Portfolio 
+**Find the efficient portfolio with the same volatility as the equally weighted portfolio. How much larger is the mean of this portfolio compared to the equally weighted portfolio?**
+
+```{r}
+ep6 = efficient.portfolio(expectR.d, Sigma.d, 0.00129, shorts = TRUE)
+ep6
+```
+
+```{r}
+ep6.bar = barplot(ep6$weights, col = c("lightblue", "orange", "darkgreen","purple","pink"), main = "Target Risk Efficient Portfolio Weights With Short Sales", names.arg = c( "AMD", "Tesla", "Delta", "Ford", "Coke-Cola"), ylim = c(-0.123,1))
+text(x=ep6.bar, y=ep6$weights, labels = paste0(round(ep6$weights, 3) * 100, "%"), pos = 3, cex = 0.7, col = "black")
+```
+
+
+```{r}
+ep6.nss = efficient.portfolio(expectR.d, Sigma.d, 0.001262, shorts = FALSE)
+ep6.nss
+ep6.nss.bar = barplot(ep6.nss$weights, col = c("lightblue", "orange", "darkgreen","purple","pink"), main = "Target Risk Efficient Portfolio Weights Without Short Sales", names.arg = c( "AMD", "Tesla", "Delta", "Ford", "Coke-Cola"), ylim = c(0,1))
+text(x=ep6.nss.bar, y=ep6.nss$weights, labels = paste0(round(ep6.nss$weights, 3) * 100, "%"), pos = 3, cex = 0.8, col = "black")
+```
+
+
+## Task 7: Tangency Portfolio
+**Using the IntroCompFinR function tangency.portfolio() compute the tangency portfolio using a monthly risk free rate equal to 0.00167 per month (which corresponds to an annual rate of 2%). Recall, we need the risk free rate to be smaller than the average return on the global minimum variance portfolio in order to get a nice graph.In the tangency portfolio, are any of the negative weights? Compute the expected return, variance and standard deviation of the tangency portfolio. Compare the Sharpe ratio of the tangency portfolio with those of the individual assets.**
+
+```{r}
+rf.d = (1+0.00167)^(1/30) - 1
+tan.p = tangency.portfolio(expectR.d, Sigma.d, rf.d, shorts = TRUE)
+sigma.vec = sqrt(diag(Sigma.d))
+summary(tan.p, rf.d)
+sr = (expectR.d-rf.d)/sigma.vec
+sr
+```
+
+```{r}
+tan.p.bar = barplot(tan.p$weights, col = c("lightblue", "orange", "darkgreen","purple","pink"), main = "Tangency Portfolio Weights With Short Sales", names.arg = c( "AMD", "Tesla", "Delta", "Ford", "Coke-Cola"), ylim = c(-0.22,1))
+text(x=tan.p.bar, y=tan.p$weights, labels = paste0(round(tan.p$weights, 3) * 100, "%"), pos = 3, cex = 0.8, col = "black")
+```
+
+
+```{r}
+rf.d = (1+0.00167)^(1/30) - 1
+tan.p.nss = tangency.portfolio(expectR.d, Sigma.d, rf.d, shorts = FALSE)
+```
+
+
+## Task 8: Tangency Portfolio with T-Bill
+**Show the tangency portfolio as well as combinations of T-bills and the tangency portfolio on a plot with the efficient frontier of risky assets.**
+
+```{r}
+ef.d.ss = efficient.frontier(expectR.d, Sigma.d, shorts = TRUE)
+cex.val = 1
+plot(ef.d.ss$sd, ef.d.ss$er, type="b", pch = 16, cex = cex.val,
+     ylim=c(-0.0007, max(ef.d.ss$er)), xlim=c(0, max(ef.d.ss$sd)),
+     xlab=expression(sigma[p]), ylab=expression(mu[p]), cex.lab=cex.val, col="darkgrey")
+
+points(globalMin.d.shortSales$sd, globalMin.d.shortSales$er, pch = 16, col = "purple", cex = cex.val)
+text(x=globalMin.d.shortSales$sd, y=globalMin.d.shortSales$er, labels="Global min", pos=4, cex = cex.val, col = "purple")
+points(0,rf.d, pch = 16, col = "red", cex = cex.val)
+text(x=0, y=rf.d, labels="rf", pos=2, cex = cex.val, col = "red")
+points(tan.p$sd, tan.p$er, pch = 16, col = "darkgreen", cex = cex.val)
+text(x=tan.p$sd, y=tan.p$er, labels="Tangency.ss              ", pos=3, cex = cex.val, col = "darkgreen")
+points(tan.p.nss$sd, tan.p.nss$er, pch = 16, col = "darkblue", cex = cex.val)
+text(x=tan.p.nss$sd, y=tan.p.nss$er, labels="                Tangency.nss", pos=1, cex = cex.val, col ="darkblue")
+
+x.tan = seq(-1,3,0.1)
+noshort.mu.tan.tbills = rf.d + x.tan*(tan.p.nss$er - rf.d)
+noshort.sig.tan.tbills = x.tan * tan.p.nss$sd
+ss.mu.tan.tbills = rf.d + x.tan*(tan.p$er - rf.d)
+ss.sig.tan.tbills = x.tan * tan.p$sd
+points(ss.sig.tan.tbills, ss.mu.tan.tbills, type = "l", col = "darkgreen", lwd = 1)
+points(noshort.sig.tan.tbills, noshort.mu.tan.tbills, type = "l", col = "darkblue", lwd = 1)
+legend("topleft",legend =c( "Tangency with Short Sales", "Tangency without Short Sales"), col = c("darkgreen", "darkblue"), lty = c(1,1), lwd = 2)
+
+```
+
+## Task 9: GMIN variance portfolio with restriction - expected return and SD
+**Using the IntroCompFinR funciton globalMin.portfolio() with optional argument shorts=FALSE, compute the global minimum variance portfolio with the added restriction that short-sales are not allowed, and calculate the expected return and SD of this portfolio.**
+
+```{r}
+# NO Short Sales for daily
+globalMin.d = globalMin.portfolio(expectR.d,Sigma.d, shorts = FALSE)
+globalMin.d
+```
+
+```{r}
+# NO short Sales
+# names(globalMin.d$weights) = c( "AMD", "Tesla", "Delta", "Ford", "Coke-Cola")
+# pie(globalMin.d$weights, col = c("lightblue", "orange", "darkgreen","purple","pink"), main = "Portfolio Weights without Short Sales", labels = paste(names(globalMin.d$weights),round(globalMin.d$weights, 3) * 100, "%"))
+
+nss.bar = barplot(globalMin.d$weights, col = c("lightblue", "orange", "darkgreen","purple","pink"), main = "GMV Portfolio Weights Without Short Sales", names.arg = c( "AMD", "Tesla", "Delta", "Ford", "Coke-Cola"), ylim = c(0,1))
+text(x=nss.bar, y=globalMin.d$weights, labels = paste0(round(globalMin.d$weights, 3) * 100, "%"), pos = 3, cex = 0.8, col = "black")
+```
+
+## Task 10: GMIN VaR
+**Assume that you have $\$100,000$ to invest for a year starting at January 31. For the global minimum variance portfolio with short-sales not allowed, determine the $1\%$ and $5\%$ value-at-risk of the \$100,000 investment over a one month investment horizon. Compare your results with those for the global minimum variance that allows short sales.**
+
+```{r}
+# Expected return and standard deviation for Global Minimum Variance Portfolio (No Short Sales)
+gmvp_return_no_short <- globalMin.d$er  # Expected return of GMVP without short sales
+gmvp_sd_no_short <- globalMin.d$sd  # Standard deviation of GMVP without short sales
+# Define the initial investment
+investment <- 100000
+
+# Define the z-scores for 1% and 5% confidence levels
+z_1_percent <- qnorm(0.01)
+z_5_percent <- qnorm(0.05)
+
+# Calculate 1% and 5% VaR for the GMVP without short sales
+VaR_1_percent_no_short <- (gmvp_return_no_short + z_1_percent * gmvp_sd_no_short) * investment
+VaR_5_percent_no_short <- (gmvp_return_no_short + z_5_percent * gmvp_sd_no_short) * investment
+
+# Combine the results into a data frame for easy reference
+VaR_results <- data.frame(
+  Portfolio = c("GMVP No Short Sales", "GMVP With Short Sales"),
+  VaR_1_Percent = c(VaR_1_percent_no_short, VaR_1_percent_short),
+  VaR_5_Percent = c(VaR_5_percent_no_short, VaR_5_percent_short)
+)
+
+# Display the VaR results
+kable(VaR_results, digits = 6, caption = "1% and 5% Value-at-Risk (VaR) for Global Minimum Variance Portfolios ($100,000 Investment)")
+```
+
+## Task 11: GMIN No Short Sale
+**Using the IntroCompFinR function efficient.frontier() with the optional argument shorts=FALSE, compute and plot the efficient portfolio frontier this time not allowing for short sales, for the 5 ETFs.Create a plot (based on monthly frequency) with portfolio expected return on the vertical axis and portfolio standard deviation on the horizontal axis showing the efficient portfolios. Indicate the location of the global minimum variance portfolio (with short sales allowed) as well as the locations of your 5 assets and the equally weighted portfolio.**
+
+```{r}
+ef.d = efficient.frontier(expectR.d, Sigma.d, shorts = FALSE)
+cex.val = 1
+plot(ef.d$sd, ef.d$er, type="b", pch = 16, cex = cex.val,
+     ylim=c(-0.0007, max(ef.d$er)+0.0002), xlim=c(0, max(ef.d$sd)+0.002),
+     xlab=expression(sigma[p]), ylab=expression(mu[p]), cex.lab=cex.val, col="darkgrey",
+     main = "Efficient Portfolio Frontier Without Short Sales")
+points(globalMin.d.shortSales$sd, globalMin.d.shortSales$er, pch = 13, col = "purple", cex = cex.val)
+text(x=globalMin.d.shortSales$sd, y=globalMin.d.shortSales$er, labels="Global min", pos=2, cex = cex.val, col = "purple")
+points(daily.e$sd, daily.e$er, pch = 16, col = "brown", cex = cex.val)
+ text(x=daily.e$sd, y=daily.e$er, labels="equally weighted", pos=4, cex = cex.val, col = "brown")
+
+ points(sigma.vec[1:5], expectR.d[1:5], pch = 13, col = "darkblue", cex = cex.val)
+ text(x = sigma.vec[1:5], y = expectR.d[1:5], labels = names(sigma.vec), pos = 4, cex = cex.val, col = "darkblue")
+
+```
+
+## Task 12: Compare Shotsale and No Shortsale frontier
+**Compare the no short sale frontier with the frontier allowing short sales (plot them on the same graph). The no short sales frontier should be "inside" the frontier allowing for short sales.**
+
+```{r}
+
+plot(ef.d$sd, ef.d$er, type = "b", pch = 16, cex = 1,
+     col = "blue", lwd = 2,
+     xlab = expression(sigma[p]), ylab = expression(mu[p]),
+     xlim = c(0, max(ef.d$sd, ef.d.ss$sd)), 
+     ylim = c(min(ef.d$er, ef.d.ss$er), max(ef.d$er, ef.d.ss$er)))
+
+lines(ef.d.ss$sd, ef.d.ss$er, type = "b", pch = 16, cex = 1,
+      col = "purple", lwd = 2)
+
+legend("topleft", legend = c("No Short Selling", "With Short Selling"),
+       col = c("blue", "purple"), lty = 1, pch = 16, bty = "n", cex = 1.2)
+
+points(globalMin.d.shortSales$sd, globalMin.d.shortSales$er, pch = 13, col = "chocolate", cex = cex.val)
+text(x=globalMin.d.shortSales$sd, y=globalMin.d.shortSales$er, labels="Global min", pos=2, cex = cex.val, col = "chocolate")
+points(daily.e$sd, daily.e$er, pch = 16, col = "brown", cex = cex.val)
+ text(x=daily.e$sd, y=daily.e$er, labels="equally weighted", pos=4, cex = cex.val, col = "brown")
+
+points(sigma.vec[1:5], expectR.d[1:5], pch = 13, col = "darkgreen", cex = cex.val)
+ text(x = sigma.vec[1:5], y = expectR.d[1:5], labels = names(sigma.vec), pos = 4, cex = cex.val, col = "darkgreen")
+```
+
+
+```{r}
+ef.d.ss = efficient.frontier(expectR.d, Sigma.d, shorts = TRUE)
+cex.val = 1
+plot(ef.d.ss$sd, ef.d.ss$er, type="b", pch = 16, cex = cex.val,
+     ylim=c(-0.0007, max(ef.d.ss$er)), xlim=c(0, max(ef.d.ss$sd)),
+     xlab=expression(sigma[p]), ylab=expression(mu[p]), cex.lab=cex.val, col="darkgrey")
+
+lines(ef.d$sd, ef.d$er, type = "l", pch = 16, cex = 1, col = "pink", lwd = 2)
+
+points(globalMin.d.shortSales$sd, globalMin.d.shortSales$er, pch = 13, col = "purple", cex = cex.val)
+text(x=globalMin.d.shortSales$sd, y=globalMin.d.shortSales$er, labels="Global min", pos=2, cex = cex.val, col = "purple")
+points(0,rf.d, pch = 16, col = "red", cex = cex.val)
+text(x=0, y=rf.d, labels="rf", pos=2, cex = cex.val, col = "red")
+points(tan.p$sd, tan.p$er, pch = 16, col = "darkgreen", cex = cex.val)
+text(x=tan.p$sd, y=tan.p$er, labels="Tangency.ss              ", pos=3, cex = cex.val, col = "darkgreen")
+points(tan.p.nss$sd, tan.p.nss$er, pch = 16, col = "darkblue", cex = cex.val)
+text(x=tan.p.nss$sd, y=tan.p.nss$er, labels="                Tangency.nss", pos=1, cex = cex.val, col ="darkblue")
+
+x.tan = seq(-1,3,0.1)
+noshort.mu.tan.tbills = rf.d + x.tan*(tan.p.nss$er - rf.d)
+noshort.sig.tan.tbills = x.tan * tan.p.nss$sd
+ss.mu.tan.tbills = rf.d + x.tan*(tan.p$er - rf.d)
+ss.sig.tan.tbills = x.tan * tan.p$sd
+points(ss.sig.tan.tbills, ss.mu.tan.tbills, type = "l", col = "darkgreen", lwd = 1)
+points(noshort.sig.tan.tbills, noshort.mu.tan.tbills, type = "l", col = "darkblue", lwd = 1)
+legend("topleft",legend =c( "Tangency with Short Sales", "Tangency without Short Sales", "Efficient Portfolio without Short Sales"), col = c("darkgreen", "darkblue", "pink"), lty = c(1,1), lwd = 2)
+
+points(daily.e$sd, daily.e$er, pch = 16, col = "brown", cex = cex.val)
+ text(x=daily.e$sd, y=daily.e$er, labels="equally weighted", pos=4, cex = cex.val, col = "brown")
+
+points(sigma.vec[1:5], expectR.d[1:5], pch = 13, col = "cyan3", cex = cex.val)
+ text(x = sigma.vec[1:5], y = expectR.d[1:5], labels = names(sigma.vec), pos = 4, cex = cex.val, col = "cyan3")
+```
+
+
+## Task 13: Target SD efficient portfolio
+**Consider a portfolio with a target volatility of 0.02 or 2% per month. What is the approximate cost in expected return of investing in a no short sale efficient portfolio versus a short sale efficient portfolio?**
+
+```{r}
+# Target volatility
+target_volatility <- 0.02/sqrt(30)
+
+# Find the portfolio on the no-short-sale efficient frontier
+no_short_index <- which.min(abs(ef.d$sd - target_volatility))
+no_short_er <- ef.d$er[no_short_index]
+
+# Find the portfolio on the short-sale efficient frontier
+short_index <- which.min(abs(ef.d.ss$sd - target_volatility))
+short_er <- ef.d.ss$er[short_index]
+
+# Calculate the cost
+cost <- short_er - no_short_er
+
+# Output results
+cat("Expected return for no short-sale portfolio:", no_short_er, "\n")
+cat("Expected return for short-sale portfolio:", short_er, "\n")
+cat("Cost in expected return:", cost, "\n")
+
+
+```
+
+
+
+
+
+## Task 14: Tangency Portfolio with different rf
+**Using a monthly risk free rate equal to 0.00167 per month and the estimated means, variances and covariances compute the tangency portfolio imposing the additional restriction that short-sales are not allowed. Compute the expected return, variance and standard deviation of the tangency portfolio. Give the value of Sharpe's slope for the no-short sales tangency portfolio.**
+
+```{r}
+rf.d = (1+0.00167)^(1/30) - 1
+tan.p.14 = tangency.portfolio(expectR.d, Sigma.d, rf.d, shorts = FALSE)
+tan.p.14
+sr.p.14 = (tan.p.14$er-rf.d)/tan.p.14$sd
+cat("Sharpe's slope for the no-short sales tangency portfolio is", sr.p.14)
+```
+
+
+```{r}
+tan.p14.bar = barplot(tan.p.14$weights, col = c("lightblue", "orange", "darkgreen","purple","pink"), main = "Tangency Portfolio Weights Without Short Sales", names.arg = c( "AMD", "Tesla", "Delta", "Ford", "Coke-Cola"), ylim = c(0,1))
+text(x=tan.p14.bar, y=tan.p.14$weights, labels = paste0(round(tan.p.14$weights, 3) * 100, "%"), pos = 3, cex = 0.8, col = "black")
+```
+
+
+# Risk Budgeting - Step 6
+## Task 1: Rick Report (Comment)
+**For the equally weighted portfolio, create a volatility risk report based on an investment of \$100,000. Your risk report should be a table with columns for the assets, dollars invested in each asset, allocation weights, MCR, CR, PCR, asset correlation with portfolio, and asset beta with respect to the portfolio. Comment on the risk attribution of the portfolio. Does the risk attribution match the asset allocation? In other words, is there equal risk allocation in the portfolio? Which asset contributes most to the portfolio risk and which asset contributes least?**
+```{r}
+W6 = 100000
+sigma.vec = sqrt(diag(Sigma.d))
+x.weights = daily.e$weights
+d = x.weights * W6
+mu = as.numeric(crossprod(x.weights, expectR.d))
+sig = as.numeric(sqrt(t(x.weights) %*% Sigma.d %*% x.weights))
+MCR = (Sigma.d %*% x.weights)/sig
+CR = x.weights * MCR
+PCR = CR / sig
+rho = MCR/sigma.vec
+beta = PCR / x.weights
+
+riskReport = cbind(d, x.weights, sigma.vec, MCR, CR, PCR, rho, beta)
+PORT = c(W6, 1, NA, NA, sum(CR), sum(PCR),1,1)
+riskReport = rbind(riskReport, PORT)
+colnames(riskReport) = c("Dollar", "Weight", "Vol", "MCR", "CR", "PCR","Rho", "Beta")
+riskReport
+```
+
+# Asset Allocation - Step 7
+## Task 1: Target Expected Return with no Short Sale
+**Suppose you wanted to achieve a target expected return of 6% per year (which corresponds to an expected return of 0.5% per month) using only the 5 ETFs and no short sales. What is the efficient portfolio that achieves this target return? How much is invested in each of the Vanguard ETFs in this efficient portfolio? Note: you should change these numbers to what makes sense for your daily data**
+```{r}
+# given target return is lower than our global min return
+target_return <- (1+0.2)^(1/365)-1
+
+efficient_portfolio = efficient.portfolio(expectR.d, Sigma.d, target_return, shorts = FALSE)
+efficient_portfolio
+```
+
+```{r}
+efficientp.bar = barplot(efficient_portfolio$weights, col = c("lightblue", "orange", "darkgreen","purple","pink"), main = "Efficient Portfolio Weights Without Short Sales", names.arg = c( "AMD", "Tesla", "Delta", "Ford", "Coke-Cola"), ylim = c(0,1))
+text(x=efficientp.bar, y=efficient_portfolio$weights, labels = paste0(round(efficient_portfolio$weights, 3) * 100, "%"), pos = 3, cex = 0.8, col = "black")
+```
+
+## Task 2: Monthly SD and VaR
+**Compute the monthly SD on this efficient portfolio, as well as the monthly 1% and 5% value-at-risk based on an initial \$100,000 investment.**
+
+```{r}
+# efficient_risk <- sqrt(t(efficient_portfolio$weights) %*% Sigma.m %*% efficient_portfolio$weights)
+# tangency_return <- sum(tangency_portfolio$weights * expected_returns)
+# tangency_risk <- sqrt(t(tangency_portfolio$weights) %*% Sigma.m %*% tangency_portfolio$weights)
+# efficient_risk
+# tangency_return
+# tangency_risk
+
+W7 = 100000
+q.R.05 = (qnorm(0.05, efficient_portfolio$er, efficient_portfolio$sd))
+W7*q.R.05
+q.R.01 = (qnorm(0.01, efficient_portfolio$er, efficient_portfolio$sd) )
+W7*q.R.01
+
+
+# VaR_1_percent <- 100000 * qnorm(0.01) * efficient_risk  # 1% VaR
+# VaR_5_percent <- 100000 * qnorm(0.05) * efficient_risk  # 5% VaR
+# 
+# cat("\nEfficient Portfolio VaR at 1% and 5% confidence levels:\n")
+# cat("1% VaR: ", VaR_1_percent, "\n")
+# cat("5% VaR: ", VaR_5_percent, "\n")
+# 
+# VaR_1_percent_tan <- 100000 * qnorm(0.01) * tangency_risk  # 1% VaR
+# VaR_5_percent_tan <- 100000 * qnorm(0.05) * tangency_risk  # 5% VaR
+# 
+# 
+# cat("\nTangency Portfolio VaR at 1% and 5% confidence levels:\n")
+# cat("1% VaR: ", VaR_1_percent_tan, "\n")
+# cat("5% VaR: ", VaR_5_percent_tan, "\n")
+```
+
+## Task 3: Target Expected Return with RF
+**Suppose you wanted to achieve a target expected return of 6% per year (which corresponds to an expected return of 0.5% per month) using the 5 ETFs and the risk free asset (with monthly return 0.00167), with no short sales of the risky assets. What is the efficient portfolio that achieves this target return? How much is invested in each of the Vanguard ETFs and the risk free asset in this efficient portfolio?**
+
+```{r}
+rf_rate <- (1+0.00167)^(1/30)-1
+tp = tangency.portfolio(expectR.d, Sigma.d, rf_rate, shorts = FALSE)
+x.t = (target_return - rf_rate)/(tp$er - rf_rate)
+x.t
+x.rf= 1 - x.t
+x.rf
+W7*x.rf
+W7*x.t*tp$weights
+# sum(W7*x.t*tp$weights)
+```
+
+```{r}
+t3.weights = c(x.rf, tp$weights*x.t)
+names(t3.weights) = c("risk free asset","AMD", "Tesla", "Delta", "                ,Ford", "Coke-Cola")
+pie(t3.weights,col = c("red","lightblue", "orange", "darkgreen","purple","pink"), main = "Efficient Portfolios Weights", labels = paste(names(t3.weights),round(t3.weights, 3) * 100, "%"))
+
+t3.tan.weights = tp$weights
+names(t3.tan.weights) = c("AMD", "Tesla", "Delta         ", "                   ,Ford", "Coke-Cola")
+pie(t3.tan.weights,col = c("lightblue", "orange", "darkgreen","purple","pink"), main = "Tangency Portfolio Weights", labels = paste(names(t3.tan.weights),round(t3.tan.weights, 3) * 100, "%"))
+```
+
+
+\newpage
+
+# SAMPLE Executive Summary - Step 8
+BELOW are SAMPLE REPORTS to produce and summarize. Please note that your goal is to illustrate how using daily data differs from using monthly data.
+
+The purpose of the analysis to study the statistical behavior of five Vanguard ETFs (4 stock funds and 1 bond fund) and to implement mean-variance portfolio theory to create specific asset allocations among the funds. The data used for the project consists of end-of-month (DAILY) adjusted closing price data from `finance.yahoo.com` over the period Dec 2013 through Dec 2023. The statistical analysis is used to uncover stylized facts of asset behavior and to confirm the application of the GWN model. The estimates of the GWN model are inputs to the mean-variance portfolio theory.
+
+## Stylized Facts
+
+Using graphical and numerical descriptive statistics the following stylized facts of simple monthly or daily returns were observed:
+
+-   The best performing asset in terms of 10 year growth is XXX gaining about ##%...
+-   Over the full sample, the normal distribution (GWN model) is/isn't a plausible distribution for all returns
+-   Returns are correlated/uncorrelated over time.
+-   XXX haS the highest monthly mean returns at ##%. YYY have lower means returns around ##%. All of the stock ETF have similar monthly volatility around ##%. The bond ETF has the lowest volatility at ##%
+-   Mean returns and volatilities are/are not estimated very precisely ...etc.
+-   From a return-risk perspective, comment on the Sharpe ratios, are they estimated estimated precisely?
+-   How correlated are the funds? Which one(s) may be more helpful for diversification?
+-   How about their Normal 5% and 1% VaR values? Are the Normal VaR is estimated reasonably precisely? Are the Normal VaR and Empirical VaR values similar, supporting the normal distribution?
+-   Do returns appear to be covariance stationary over the full sample? Do rolling estimates of means show evidence of changing means? how about rolling volatility estimates?
+
+**Comments:**
+1.Best Performing Asset in Terms of 10-Year Growth: 
+AMD shows the highest growth with a significant return over the observed period. This aligns with its mean return being higher than other assets.
+
+2.Normal Distribution Plausibility:
+The returns do not perfectly follow a normal distribution for all assets, as indicated by excess kurtosis and skewness in AMD and others.
+Among the assets, TSLA appears closer to a normal distribution with relatively low skewness and kurtosis.
+
+3.Correlation of Returns Over Time: 
+Returns exhibit some correlation across assets, particularly between DAL and F, likely due to shared macroeconomic factors like oil prices.
+
+4.Monthly Mean and Volatility Summary:
+AMD has the highest mean return at approximately 0.00223 (0.223% monthly return).
+KO exhibits the lowest volatility, confirming its reputation as a stable, defensive stock.
+
+5.Precision of Mean and Volatility Estimates:
+Volatility estimates are more precise than mean estimates, particularly for less volatile assets like KO.
+
+6.Return-Risk Perspective and Sharpe Ratios:
+AMD has the highest Sharpe ratio, indicating a better risk-adjusted return.
+However, the Sharpe ratios are not estimated very precisely due to significant standard errors.
+
+7.Diversification Based on Correlation:
+Diversification appears beneficial as assets like KO are less correlated with others. However, DAL and F's high correlation may limit diversification benefits.
+
+8.Normal vs. Empirical VaR:
+The empirical VaR values are close to the normal VaR values, indicating consistency in the results.
+AMD has the highest VaR values at both 1% and 5% levels, making it the riskiest asset, while KO has the lowest.
+
+9.Covariance Stationarity and Rolling Estimates:
+Rolling mean and volatility plots show fluctuations, particularly during the COVID-19 period.
+This suggests that while the assumption of covariance stationarity holds over long periods, short-term events like the pandemic introduce significant deviations.
+
+## Portfolio Theory
+
+The analysis of portfolio theory are provided above. (Also, some analysis will be included in additional documents we provided)
+
+## Asset Allocation
+
+The analysis of asset allocation are provided above. (Also, some analysis will be included in additional documents we provided)
